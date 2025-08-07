@@ -49,7 +49,7 @@ join_domain() {
   # sanity backup
   cp "$SSSD_FILE" "$SSSD_FILE.bak"
   # replace line
-  sed -i 's/^fallback_homedir *= */override_homedir = /' "$SSSD_FILE"
+  sed -i 's/^fallback_homedir *=.*/override_homedir = \/home\/%u@%d/' "$SSSD_FILE"
   # add lines
   grep -q '^ad_access_filter *= ' "$SSSD_FILE" || echo "ad_access_filter = FOREST:NECTON.INTERNAL:(memberOf=CN=$ADMIN_GROUP,CN=Users,DC=necton,DC=internal)" >> "$SSSD_FILE"
   grep -q '^ad_gpo_access_control *= ' "$SSSD_FILE" || echo "ad_gpo_access_control = disabled" >> "$SSSD_FILE"
