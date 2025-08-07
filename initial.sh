@@ -1,17 +1,17 @@
 #!/bin/bash
 
+LOG_FILE="/tmp/deploy-necton.log"
+exec > >(tee -a "$LOG_FILE") 2>&1
+
 GRUB_FILE="/etc/default/grub"
+CERT_URL="https://raw.githubusercontent.com/skas-as/debian12-necton-inital-load/main/necton-WIN-CA01-RootCA-pem.crt"
+CERT_NAME="necton-WIN-CA01-RootCA-pem.crt"
+CERT_DEST="/usr/local/share/ca-certificates/$CERT_NAME"
 AD_DOMAIN="necton.internal"
 AD_ACCOUNT="goncalo.prata"
 ADMIN_GROUP="linux-admins"
 SSSD_FILE="/etc/sssd/sssd.conf"
-SUDOERS_FILE="/etc/sudoers"
-SUDOERS_LINES=$(cat <<EOF
-# Allow members of group $ADMIN_GROUP on domain necton.internal
-# to execute any command
-%$ADMIN_GROUP@$AD_DOMAIN ALL=(ALL:ALL) ALL
-EOF
-)
+SUDOERS_FILE="/etc/sudoers.d/$ADMIN_GROUP"
 
 update_grub() {
   echo "### Updating GRUB..."
@@ -23,7 +23,21 @@ update_grub() {
   echo "### GRUB_CMDLINE_LINUX updated successfully!"
 }
 
+install_cert() {
+  echo "### Downloading certificate from $CERT_URL..."
+  if wget -q -O "$CERT_DEST" "$CERT_URL"; then
+    chmod 644 "$CERT_DEST"
+    chown root:root "$CERT_DEST"
+    echo "### Updating trusted certificates..."
+    update-ca-certificates
+    echo "### Certificate $CERT_NAME installed successfully."
+  else
+    echo "### ERROR: Failed to download certificate from $CERT_URL"
+  fi
+}
+
 join_domain() {
+  install_cert
   echo "### Joining domain..."
   # installing necessary packages
   apt install adcli packagekit samba-common-bin sudo -y
@@ -43,22 +57,24 @@ join_domain() {
   # enable auto home creation
   pam-auth-update
   # visudo
-  # sanity backup
-  cp "$SUDOERS_FILE" "$SUDOERS_FILE.bak"
-  # insert after sudo group
-  if ! grep -q "%$ADMIN_GROUP@$AD_DOMAIN" "$SUDOERS_FILE"; then
-    sed -i "/^%sudo\s\+ALL=(ALL:ALL) ALL/a\\
-$SUDOERS_LINES
-" "$SUDOERS_FILE"
+  if [[ -f "$SUDOERS_FILE" ]]; then
+    echo "### Sudoers file $SUDOERS_FILE already exists. Skipping creation."
   else
-    echo "### Entry for $ADMIN_GROUP already exists in sudoers file."
-  fi
-  # check syntax
-  if visudo -c -f "$SUDOERS_FILE"; then
-    echo "### Valid sudoers file!"
-  else
-    echo "Syntax error on sudoers file! reverting..."
-    cp "$SUDOERS_FILE.bak" "$SUDOERS_FILE"
+    # insert after sudo group
+    cat <<EOF > "$SUDOERS_FILE"
+# Allow members of group $ADMIN_GROUP on domain $AD_DOMAIN
+# to execute any command
+%$ADMIN_GROUP@$AD_DOMAIN ALL=(ALL:ALL) ALL
+EOF
+    # change permissions
+    chmod 440 "$SUDOERS_FILE"
+    # check syntax
+    if visudo -c -f "$SUDOERS_FILE"; then
+      echo "### Valid sudoers file!"
+    else
+      echo "Syntax error on sudoers file! reverting..."
+      rm "$SUDOERS_FILE"
+    fi
   fi
 }
 
