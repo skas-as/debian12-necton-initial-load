@@ -10,6 +10,7 @@ CERT_DEST="/usr/local/share/ca-certificates/$CERT_NAME"
 AD_DOMAIN="necton.internal"
 AD_ACCOUNT="goncalo.prata"
 ADMIN_GROUP="linux-admins"
+APP_GROUP="iot-admins"
 SSSD_FILE="/etc/sssd/sssd.conf"
 SUDOERS_FILE="/etc/sudoers.d/$ADMIN_GROUP"
 
@@ -51,7 +52,7 @@ join_domain() {
   # replace line
   sed -i 's/^fallback_homedir *=.*/override_homedir = \/home\/%u@%d/' "$SSSD_FILE"
   # add lines
-  grep -q '^ad_access_filter *= ' "$SSSD_FILE" || echo "ad_access_filter = FOREST:NECTON.INTERNAL:(memberOf=CN=$ADMIN_GROUP,CN=Users,DC=necton,DC=internal)" >> "$SSSD_FILE"
+  grep -q '^ad_access_filter *= ' "$SSSD_FILE" || echo "ad_access_filter = FOREST:NECTON.INTERNAL:(|(memberOf=CN=$ADMIN_GROUP,CN=Users,DC=necton,DC=internal)(memberOf=CN=$APP_GROUP,CN=Users,DC=necton,DC=internal))" >> "$SSSD_FILE"
   grep -q '^ad_gpo_access_control *= ' "$SSSD_FILE" || echo "ad_gpo_access_control = disabled" >> "$SSSD_FILE"
   systemctl restart sssd
   # enable auto home creation
