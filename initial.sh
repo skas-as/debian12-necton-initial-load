@@ -3,6 +3,15 @@
 GRUB_FILE="/etc/default/grub"
 AD_DOMAIN="necton.internal"
 AD_ACCOUNT="goncalo.prata"
+ADMIN_GROUP="linux-admins"
+SSSD_FILE="/etc/sssd/sssd.conf"
+SUDOERS_FILE="/etc/sudoers"
+SUDOERS_LINES=$(cat <<EOF
+# Allow members of group $ADMIN_GROUP on domain necton.internal
+# to execute any command
+%$ADMIN_GROUP@$AD_DOMAIN ALL=(ALL:ALL) ALL
+EOF
+)
 
 update_grub() {
   echo "### Updating GRUB..."
@@ -20,10 +29,37 @@ join_domain() {
   apt install adcli packagekit samba-common-bin sudo -y
   apt install realmd -y
   # testing ad discovery
-  realm -v discover $AD_DOMAIN
+  realm -v discover "$AD_DOMAIN"
   # joining ad
-  realm -v join $AD_DOMAIN -U $AD_ACCOUNT
-  # TODO
+  realm -v join "$AD_DOMAIN" -U "$AD_ACCOUNT"
+  # sanity backup
+  cp "$SSSD_FILE" "$SSSD_FILE.bak"
+  # replace line
+  sed -i 's/^fallback_homedir *= */override_homedir = /' "$SSSD_FILE"
+  # add lines
+  grep -q '^ad_access_filter *= ' "$SSSD_FILE" || echo "ad_access_filter = FOREST:NECTON.INTERNAL:(memberOf=CN=$ADMIN_GROUP,CN=Users,DC=necton,DC=internal)" >> "$SSSD_FILE"
+  grep -q '^ad_gpo_access_control *= ' "$SSSD_FILE" || echo "ad_gpo_access_control = disabled" >> "$SSSD_FILE"
+  systemctl restart sssd
+  # enable auto home creation
+  pam-auth-update
+  # visudo
+  # sanity backup
+  cp "$SUDOERS_FILE" "$SUDOERS_FILE.bak"
+  # insert after sudo group
+  if ! grep -q "%$ADMIN_GROUP@$AD_DOMAIN" "$SUDOERS_FILE"; then
+    sed -i "/^%sudo\s\+ALL=(ALL:ALL) ALL/a\\
+$SUDOERS_LINES
+" "$SUDOERS_FILE"
+  else
+    echo "### Entry for $ADMIN_GROUP already exists in sudoers file."
+  fi
+  # check syntax
+  if visudo -c -f "$SUDOERS_FILE"; then
+    echo "### Valid sudoers file!"
+  else
+    echo "Syntax error on sudoers file! reverting..."
+    cp "$SUDOERS_FILE.bak" "$SUDOERS_FILE"
+  fi
 }
 
 execute_all() {
