@@ -1,0 +1,24 @@
+[Unit]
+Description=Node-RED
+After=network.target
+Documentation=http://nodered.org/
+
+[Service]
+Type=simple
+User=nodered
+Group=nodered
+WorkingDirectory=/home/nodered
+
+Environment="XDG_RUNTIME_DIR=/run/user/%U"
+Environment="NODE_OPTIONS=--max_old_space_size=1024"
+ExecStartPre=/bin/bash -c '/bin/journalctl -b -u systemd-timesyncd | /bin/grep -q "systemd-timesyncd.* Synchronized to time server"'
+
+ExecStart=/usr/bin/node-red
+Restart=on-failure
+RestartSec=20
+SyslogIdentifier=Node-RED
+Nice=10
+KillSignal=SIGINT
+
+[Install]
+WantedBy=multi-user.target
