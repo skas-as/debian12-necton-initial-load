@@ -23,6 +23,8 @@
 // for pam login
 const pam = require('authenticate-pam');
 const { execFile } = require('child_process');
+// for local user
+const bcrypt = require('bcryptjs');
 
 module.exports = {
 
@@ -45,7 +47,7 @@ module.exports = {
      * node-red from being able to decrypt your existing credentials and they will be
      * lost.
      */
-    credentialSecret: "SECRETPLACEHOLDER",
+    credentialSecret: "kzYWQjGwgyFlGgfkHgKbGl2uUPkP8UfnOt5pKSsx89zsb4KHr2ULkl0nQ9ZTl45N",
 
     /** By default, the flow JSON will be formatted over multiple lines making
      * it easier to compare changes when using version control.
@@ -81,60 +83,87 @@ module.exports = {
       sessionExpiryTime: 86400,
       type: "credentials",
 
-      // Let Node-RED "find" domain users when validating tokens.
-      // No password here; actual auth happens below.
+      // Used for token validation on every request (and to define local users)
       users: async function (username) {
-        if (/@necton\.internal$/i.test(username)) {
-          return { username, permissions: "*" };
+        // Local fallback admin (no group gate needed)
+        if (username === "nr-admin") {
+          return { username: "nr-admin", permissions: "*" };
         }
-        return null;
-      },
 
-      // Authenticate via PAM/SSSD and gate on iot-admins
-      authenticate: async function (username, password) {
+        // AD users must currently be members of iot-admins
         if (!/@necton\.internal$/i.test(username)) return null;
 
-        return new Promise((resolve) => {
-          const upn = username;
-          const shortname = username.split('@')[0];
+        const upn = username;
+        const shortname = username.split("@")[0];
 
-          const groupGate = (nameUsed, how) => {
-            execFile('id', ['-nG', nameUsed], (e, stdout) => {
-              if (e) {
-                console.error(`[auth] id -nG failed for ${nameUsed}:`, e?.message || e);
-                return resolve(null);
-              }
+        return new Promise((resolve) => {
+          execFile("id", ["-nG", upn], (e, stdout) => {
+            if (!e) {
               const groups = stdout.trim().toLowerCase().split(/\s+/);
-              const ok = groups.includes('iot-admins') || groups.includes('iot-admins@necton.internal');
-              if (!ok) {
-                console.warn(`[auth] ${nameUsed} authenticated but not in iot-admins`);
-                return resolve(null);
+              if (groups.includes("iot-admins") || groups.includes("iot-admins@necton.internal")) {
+                return resolve({ username: upn, permissions: "*" });
               }
+            }
+            // Fallback: query the group directly
+            execFile("getent", ["group", "iot-admins@necton.internal"], (e2, out2) => {
+              if (e2 || !out2) return resolve(null);
+              const members = out2
+                .split(":")
+                .pop()
+                .split(",")
+                .map(s => s.trim().toLowerCase())
+                .filter(Boolean);
+              const ok =
+                members.includes(upn.toLowerCase()) ||
+                members.includes(shortname.toLowerCase()) ||
+                members.includes(`${shortname.toLowerCase()}@necton.internal`);
+              resolve(ok ? { username: upn, permissions: "*" } : null);
+            });
+          });
+        });
+      },
+
+      // Global login handler for both kinds of users
+      authenticate: async function (username, password) {
+        // 1) Local fallback: verify bcrypt ourselves (so we can keep a global authenticate)
+        if (username === "nr-admin") {
+          const ok = bcrypt.compareSync(
+            password,
+            "$2y$08$2TpTAratSl/TZGnOL4Nm8ONIuLQrOT5LCz1smtxshUrcf2ZSCy0H6"
+          );
+          if (!ok) return null;
+          return { username: "nr-admin", permissions: "*" };
+        }
+
+        // 2) AD users: PAM(login) UPN→shortname + iot-admins gate
+        if (!/@necton\.internal$/i.test(username)) return null;
+
+        const upn = username;
+        const shortname = username.split("@")[0];
+
+        return new Promise((resolve) => {
+          const issueIfInGroup = (nameUsed, how) => {
+            execFile("id", ["-nG", nameUsed], (e, stdout) => {
+              if (e) return resolve(null);
+              const groups = stdout.trim().toLowerCase().split(/\s+/);
+              const ok = groups.includes("iot-admins") || groups.includes("iot-admins@necton.internal");
+              if (!ok) return resolve(null);
               console.log(`[auth] issuing session for ${upn} (${how})`);
-              return resolve({ username: upn, permissions: "*" });
+              resolve({ username: upn, permissions: "*" });
             });
           };
 
-          // Try UPN first, then shortname
+          // Try UPN; if that fails, try shortname via default 'login' (SSSD)
           pam.authenticate(upn, password, (err) => {
-            if (!err) {
-              console.log(`[auth] PAM(login) OK for ${upn} (UPN)`);
-              return groupGate(upn, 'UPN');
-            }
-            console.warn(`[auth] PAM(login) failed for ${upn}; retrying as short name: ${shortname}`);
+            if (!err) return issueIfInGroup(upn, "UPN");
             pam.authenticate(shortname, password, (err2) => {
-              if (err2) {
-                console.error(`[auth] PAM(login) failed for ${shortname}:`, err2?.message || err2);
-                return resolve(null);
-              }
-              console.log(`[auth] PAM(login) OK for ${shortname} (shortname)`);
-              return groupGate(shortname, 'shortname');
+              if (err2) return resolve(null);
+              return issueIfInGroup(shortname, "shortname");
             });
           });
         });
       }
     },
-
 
     /** The following property can be used to enable HTTPS
      * This property can be either an object, containing both a (private) key
