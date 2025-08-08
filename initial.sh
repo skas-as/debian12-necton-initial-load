@@ -127,7 +127,7 @@ deploy_nodered() {
   sed -i "s|\( *credentialSecret: \)\"SECRETPLACEHOLDER\"|\1\"$SECRET\"|" "$NRSET_DEST"
   # install pam things
   cd /home/nodered/.node-red
-  sudo -u nodered npm install authenticate-pam --save
+  sudo -u nodered npm install authenticate-pam bcryptjs node-red-contrib-calculate node-red-contrib-influxdb node-red-contrib-modbus --save
   # get out of folder
   cd
   systemctl enable nodered.service
