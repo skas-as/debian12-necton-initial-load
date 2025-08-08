@@ -130,6 +130,7 @@ deploy_nodered() {
   sudo -u nodered npm install authenticate-pam --save
   # get out of folder
   cd
+  systemctl enable nodered.service
 }
 
 ###########################################################################################
