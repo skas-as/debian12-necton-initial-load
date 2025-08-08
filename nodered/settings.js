@@ -20,6 +20,10 @@
  *
  **/
 
+// for pam login
+const pam = require('authenticate-pam');
+const { execFile } = require('child_process');
+
 module.exports = {
 
 /*******************************************************************************
@@ -41,7 +45,7 @@ module.exports = {
      * node-red from being able to decrypt your existing credentials and they will be
      * lost.
      */
-    //credentialSecret: "a-secret-key",
+    credentialSecret: "SECRETPLACEHOLDER",
 
     /** By default, the flow JSON will be formatted over multiple lines making
      * it easier to compare changes when using version control.
@@ -74,13 +78,63 @@ module.exports = {
      * property can be used. See https://nodered.org/docs/security.html for details.
      */
     adminAuth: {
-        type: "credentials",
-        users: [{
-            username: "admin",
-            password: "$2a$08$zZWtXTja0fB1pzD4sHCMyOCMYz2Z6dNbM6tl8sJogENOMcxWV9DN.",
-            permissions: "*"
-        }]
+      sessionExpiryTime: 86400,
+      type: "credentials",
+
+      // Let Node-RED "find" domain users when validating tokens.
+      // No password here; actual auth happens below.
+      users: async function (username) {
+        if (/@necton\.internal$/i.test(username)) {
+          return { username, permissions: "*" };
+        }
+        return null;
+      },
+
+      // Authenticate via PAM/SSSD and gate on iot-admins
+      authenticate: async function (username, password) {
+        if (!/@necton\.internal$/i.test(username)) return null;
+
+        return new Promise((resolve) => {
+          const upn = username;
+          const shortname = username.split('@')[0];
+
+          const groupGate = (nameUsed, how) => {
+            execFile('id', ['-nG', nameUsed], (e, stdout) => {
+              if (e) {
+                console.error(`[auth] id -nG failed for ${nameUsed}:`, e?.message || e);
+                return resolve(null);
+              }
+              const groups = stdout.trim().toLowerCase().split(/\s+/);
+              const ok = groups.includes('iot-admins') || groups.includes('iot-admins@necton.internal');
+              if (!ok) {
+                console.warn(`[auth] ${nameUsed} authenticated but not in iot-admins`);
+                return resolve(null);
+              }
+              console.log(`[auth] issuing session for ${upn} (${how})`);
+              return resolve({ username: upn, permissions: "*" });
+            });
+          };
+
+          // Try UPN first, then shortname
+          pam.authenticate(upn, password, (err) => {
+            if (!err) {
+              console.log(`[auth] PAM(login) OK for ${upn} (UPN)`);
+              return groupGate(upn, 'UPN');
+            }
+            console.warn(`[auth] PAM(login) failed for ${upn}; retrying as short name: ${shortname}`);
+            pam.authenticate(shortname, password, (err2) => {
+              if (err2) {
+                console.error(`[auth] PAM(login) failed for ${shortname}:`, err2?.message || err2);
+                return resolve(null);
+              }
+              console.log(`[auth] PAM(login) OK for ${shortname} (shortname)`);
+              return groupGate(shortname, 'shortname');
+            });
+          });
+        });
+      }
     },
+
 
     /** The following property can be used to enable HTTPS
      * This property can be either an object, containing both a (private) key
@@ -184,7 +238,10 @@ module.exports = {
      * cookie used as part of adminAuth authentication system
      * Available options are documented here: https://www.npmjs.com/package/express-session#cookie
      */
-    // httpAdminCookieOptions: { },
+     httpAdminCookieOptions: {
+       sameSite: "Lax",
+       secure: true
+     },
 
     /** Some nodes, such as HTTP In, can be used to listen for incoming http requests.
      * By default, these are served relative to '/'. The following property
@@ -559,7 +616,7 @@ module.exports = {
     //ui: { path: "ui" },
 
     /** Colourise the console output of the debug node */
-    //debugUseColors: true,
+    debugUseColors: true,
 
     /** The maximum length, in characters, of any message sent to the debug sidebar tab */
     debugMaxLength: 1000,
