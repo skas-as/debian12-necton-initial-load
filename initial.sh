@@ -13,6 +13,10 @@ ADMIN_GROUP="linux-admins"
 APP_GROUP="iot-admins"
 SSSD_FILE="/etc/sssd/sssd.conf"
 SUDOERS_FILE="/etc/sudoers.d/$ADMIN_GROUP"
+NRSVC_URL="https://raw.githubusercontent.com/skas-as/debian12-necton-inital-load/main/nodered/nodered.service"
+NRSVC_DEST="/lib/systemd/system/nodered.service"
+NRSET_URL="https://raw.githubusercontent.com/skas-as/debian12-necton-inital-load/main/nodered/settings.js"
+NRSET_DEST="/home/nodered/.node-red/settings.js"
 
 update_grub() {
   echo "### Updating GRUB..."
@@ -85,12 +89,55 @@ execute_all() {
   join_domain
 }
 
+deploy_nodered() {
+  echo "### Installing Node-RED..."
+  apt update && apt install curl git build-essential libpam0g-dev -y
+  # add nodered user
+  adduser --home /home/nodered --disabled-password --gecos "" nodered
+  # give it tmp root access
+  echo "nodered ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/nodered-temp
+  chmod 440 /etc/sudoers.d/nodered-temp
+  usermod -aG sudo nodered
+  # install node-red
+  curl -sL https://github.com/node-red/linux-installers/releases/latest/download/update-nodejs-and-nodered-deb | sudo -u nodered bash -s -- --node22 --skip-pi --confirm-install --nodered-user=nodered
+  # remove root from nodered
+  gpasswd -d nodered sudo
+  rm /etc/sudoers.d/nodered-temp
+  # install correct nodered service
+  echo "### Downloading nodered.service from $NRSVC_URL..."
+  if wget -q -O "$NRSVC_DEST" "$NRSVC_URL"; then
+    chmod 644 "$NRSVC_DEST"
+    chown root:root "$NRSVC_DEST"
+    echo "### Updating daemons..."
+    systemctl daemon-reload
+  else
+    echo "### ERROR: Failed to download nodered.service from $NRSVC_URL"
+  fi
+  # install correct nodered settings
+  mkdir -p /home/nodered/.node-red
+  echo "### Downloading settings.js from $NRSET_URL..."
+  if wget -q -O "$NRSET_DEST" "$NRSET_URL"; then
+    chmod 644 "$NRSET_DEST"
+    chown nodered:nodered "$NRSET_DEST"
+  else
+    echo "### ERROR: Failed to download settings.js from $NRSET_URL"
+  fi
+  # Generate a 48-byte base64 secret and replace on settings.js
+  SECRET=$(openssl rand -base64 48)
+  sed -i "s|\( *credentialSecret: \)\"SECRETPLACEHOLDER\"|\1\"$SECRET\"|" "$NRSET_DEST"
+  # install pam things
+  cd /home/nodered/.node-red
+  sudo -u nodered npm install authenticate-pam --save
+  # get out of folder
+  cd
+}
+
 ###########################################################################################
 echo "###########################"
 echo "# Debian 12 Deploy Script #"
 echo "###########################"
 PS3="### Choose an option (or 0 to quit): "
-options=("Update GRUB for xterm.js" "Join $AD_DOMAIN domain" "Execute all of the above" "Quit")
+options=("Update GRUB for xterm.js" "Join $AD_DOMAIN domain" "Execute all of the above" "Install and Configure Node-RED" "Quit")
 
 select opt in "${options[@]}"
 do
@@ -98,7 +145,8 @@ do
     1) update_grub ;;
     2) join_domain ;;
     3) execute_all ;;
-    4|0) echo "Exiting..."; break ;;
+    4) deploy_nodered ;;
+    5|0) echo "Exiting..."; break ;;
     *) echo "Invalid option."; ;;
   esac
 done
