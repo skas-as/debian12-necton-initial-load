@@ -125,7 +125,7 @@ deploy_nodered() {
   # Generate a 48-byte base64 secret and replace on settings.js
   SECRET=$(openssl rand -base64 48)
   sed -i "s|\( *credentialSecret: \)\"SECRETPLACEHOLDER\"|\1\"$SECRET\"|" "$NRSET_DEST"
-  # install pam things
+  # install npm addons
   cd /home/nodered/.node-red
   sudo -u nodered npm install authenticate-pam bcryptjs node-red-contrib-calculate node-red-contrib-influxdb node-red-contrib-modbus --save
   # get out of folder
