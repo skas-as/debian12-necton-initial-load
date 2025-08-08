@@ -91,8 +91,8 @@ module.exports = {
 
     /** Option 1: static object */
     https: {
-      key: require("fs").readFileSync('privkey.pem'),
-      cert: require("fs").readFileSync('cert.pem')
+      key: require("fs").readFileSync('/home/nodered/.node-red/privkey.pem'),
+      cert: require("fs").readFileSync('/home/nodered/.node-red/cert.pem')
     },
 
     /** Option 2: function that returns the HTTP configuration object */
