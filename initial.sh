@@ -142,7 +142,8 @@ deploy_nodered() {
   # issue csr and key
   openssl req -new -newkey rsa:2048 -nodes -keyout ${HOSTNAME}.key -out ${HOSTNAME}.csr -subj "/CN=${FQDN}" -addext "subjectAltName=DNS:${FQDN}"
   # change ownership
-  chown nodered:nodered "$HOSTNAME.*"
+  chown nodered:nodered "$HOSTNAME.key"
+  chown nodered:nodered "$HOSTNAME.csr"
   # create symlinks for certs
   ln -s ${HOSTNAME}.key privkey.pem
   ln -s ${HOSTNAME}.crt cert.pem
