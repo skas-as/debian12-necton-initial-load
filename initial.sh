@@ -3,6 +3,8 @@
 LOG_FILE="/tmp/deploy-necton.log"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
+HOSTNAME=$(hostname)
+FQDN=$(hostname -f)
 GRUB_FILE="/etc/default/grub"
 CERT_URL="https://raw.githubusercontent.com/skas-as/debian12-necton-inital-load/main/necton-WIN-CA01-RootCA-pem.crt"
 CERT_NAME="necton-WIN-CA01-RootCA-pem.crt"
@@ -17,6 +19,8 @@ NRSVC_URL="https://raw.githubusercontent.com/skas-as/debian12-necton-inital-load
 NRSVC_DEST="/lib/systemd/system/nodered.service"
 NRSET_URL="https://raw.githubusercontent.com/skas-as/debian12-necton-inital-load/main/nodered/settings.js"
 NRSET_DEST="/home/nodered/.node-red/settings.js"
+NRUSR_URL="https://raw.githubusercontent.com/skas-as/debian12-necton-inital-load/main/nodered/.config.users.json"
+NRUSR_DEST="/home/nodered/.node-red/.config.users.json"
 
 update_grub() {
   echo "### Updating GRUB..."
@@ -122,12 +126,26 @@ deploy_nodered() {
   else
     echo "### ERROR: Failed to download settings.js from $NRSET_URL"
   fi
+  echo "### Downloading .config.users.json from $NRUSR_URL..."
+  if wget -q -O "$NRUSR_DEST" "$NRUSR_URL"; then
+    chmod 644 "$NRUSR_DEST"
+    chown nodered:nodered "$NRUSR_DEST"
+  else
+    echo "### ERROR: Failed to download .config.users.json from $NRUSR_URL"
+  fi
   # Generate a 48-byte base64 secret and replace on settings.js
   SECRET=$(openssl rand -base64 48)
   sed -i "s|\( *credentialSecret: \)\"SECRETPLACEHOLDER\"|\1\"$SECRET\"|" "$NRSET_DEST"
   # install npm addons
   cd /home/nodered/.node-red
   sudo -u nodered npm install authenticate-pam bcryptjs node-red-contrib-calculate node-red-contrib-influxdb node-red-contrib-modbus --save
+  # issue csr and key
+  openssl req -new -newkey rsa:2048 -nodes -keyout ${HOSTNAME}.key -out ${HOSTNAME}.csr -subj "/CN=${FQDN}" -addext "subjectAltName=DNS:${FQDN}"
+  # change ownership
+  chown nodered:nodered "$HOSTNAME.*"
+  # create symlinks for certs
+  ln -s ${HOSTNAME}.key privkey.pem
+  ln -s ${HOSTNAME}.crt cert.pem
   # get out of folder
   cd
   systemctl enable nodered.service

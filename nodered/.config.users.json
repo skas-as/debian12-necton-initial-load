@@ -1,0 +1,102 @@
+{
+    "goncalo.prata@necton.internal": {
+        "editor": {
+            "view": {
+                "view-store-zoom": false,
+                "view-store-position": false,
+                "view-show-grid": true,
+                "view-snap-grid": true,
+                "view-grid-size": "20",
+                "view-node-status": true,
+                "view-node-info-icon": true,
+                "view-node-show-label": true,
+                "view-show-tips": true,
+                "view-show-welcome-tours": true
+            }
+        },
+        "git": {
+            "user": {
+                "name": "goncalo.prata",
+                "email": "gg.prata@campus.fct.unl.pt"
+            },
+            "workflow": {
+                "mode": "auto"
+            }
+        }
+    },
+    "nr-admin": {
+        "editor": {
+            "view": {
+                "view-store-zoom": false,
+                "view-store-position": false,
+                "view-show-grid": true,
+                "view-snap-grid": true,
+                "view-grid-size": 20,
+                "view-node-status": true,
+                "view-node-info-icon": true,
+                "view-node-show-label": true,
+                "view-show-tips": true,
+                "view-show-welcome-tours": true
+            }
+        },
+        "git": {
+            "user": {
+                "name": "nr-admin",
+                "email": "nr-admin@necton.internal"
+            },
+            "workflow": {
+                "mode": "auto"
+            }
+        }
+    },
+    "roberto.pires@necton.internal": {
+        "editor": {
+            "view": {
+                "view-store-zoom": false,
+                "view-store-position": false,
+                "view-show-grid": true,
+                "view-snap-grid": true,
+                "view-grid-size": 20,
+                "view-node-status": true,
+                "view-node-info-icon": true,
+                "view-node-show-label": true,
+                "view-show-tips": true,
+                "view-show-welcome-tours": true
+            }
+        },
+        "git": {
+            "user": {
+                "name": "roberto.pires",
+                "email": "roberto.pires@rowmetric.com"
+            },
+            "workflow": {
+                "mode": "auto"
+            }
+        }
+    },
+    "david.ferreira@necton.internal": {
+        "editor": {
+            "view": {
+                "view-store-zoom": false,
+                "view-store-position": false,
+                "view-show-grid": true,
+                "view-snap-grid": true,
+                "view-grid-size": 20,
+                "view-node-status": true,
+                "view-node-info-icon": true,
+                "view-node-show-label": true,
+                "view-show-tips": true,
+                "view-show-welcome-tours": true
+            }
+        },
+        "git": {
+            "user": {
+                "name": "david.ferreira",
+                "email": "davidferreira@skas-as.com"
+            },
+            "workflow": {
+                "mode": "auto"
+            }
+        }
+    }
+}
