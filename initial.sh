@@ -143,9 +143,11 @@ deploy_nodered() {
   sudo -u nodered npm install authenticate-pam bcryptjs node-red-contrib-calculate node-red-contrib-influxdb node-red-contrib-modbus --save
   # issue csr and key
   openssl req -new -newkey rsa:2048 -nodes -keyout ${HOSTNAME}.key -out ${HOSTNAME}.csr -subj "/CN=${FQDN}" -addext "subjectAltName=DNS:${FQDN}"
+  touch ${HOSTNAME}.crt
   # change ownership
   chown nodered:nodered "$HOSTNAME.key"
   chown nodered:nodered "$HOSTNAME.csr"
+  chown nodered:nodered "$HOSTNAME.crt"
   # create symlinks for certs
   ln -s ${HOSTNAME}.key privkey.pem
   ln -s ${HOSTNAME}.crt cert.pem
