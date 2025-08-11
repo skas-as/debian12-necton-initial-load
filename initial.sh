@@ -32,11 +32,6 @@ update_grub() {
   echo "### GRUB_CMDLINE_LINUX updated successfully!"
 }
 
-edit_interfaces() {
-  echo "### Editing /etc/network/interfaces"
-  script -q -c "nano /etc/network/interfaces" /dev/null
-}
-
 install_cert() {
   echo "### Downloading certificate from $CERT_URL..."
   if wget -q -O "$CERT_DEST" "$CERT_URL"; then
@@ -95,7 +90,6 @@ EOF
 execute_all() {
   echo "### Executing everything..."
   update_grub
-  edit_interfaces
   join_domain
 }
 
@@ -165,17 +159,16 @@ echo "###########################"
 echo "# Debian 12 Deploy Script #"
 echo "###########################"
 PS3="### Choose an option (or 0 to quit): "
-options=("Update GRUB for xterm.js" "Edit /etc/network/interfaces" "Join $AD_DOMAIN domain" "Execute all of the above" "Install and Configure Node-RED" "Quit")
+options=("Update GRUB for xterm.js" "Join $AD_DOMAIN domain" "Execute all of the above" "Install and Configure Node-RED" "Quit")
 
 select opt in "${options[@]}"
 do
   case $REPLY in
     1) update_grub ;;
-    2) edit_interfaces ;;
-    3) join_domain ;;
-    4) execute_all ;;
-    5) deploy_nodered ;;
-    6|0) echo "Exiting..."; break ;;
+    2) join_domain ;;
+    3) execute_all ;;
+    4) deploy_nodered ;;
+    5|0) echo "Exiting..."; break ;;
     *) echo "Invalid option."; ;;
   esac
 done
