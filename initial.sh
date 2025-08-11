@@ -142,6 +142,8 @@ deploy_nodered() {
   # Generate a 48-byte base64 secret and replace on settings.js
   SECRET=$(openssl rand -base64 48)
   sed -i "s|\( *credentialSecret: \)\"SECRETPLACEHOLDER\"|\1\"$SECRET\"|" "$NRSET_DEST"
+  UIHOST=$(ip -4 -o addr show scope global | awk '{print $4}' | cut -d/ -f1 | awk '/^10\.150\.(40|41)\./{print; exit}')
+  sed -i "s|\( *uiHost: \)\"127.0.0.1\"|\1\"$UIHOST\"|" "$NRSET_DEST"
   # install npm addons
   cd /home/nodered/.node-red
   sudo -u nodered npm install authenticate-pam bcryptjs node-red-contrib-calculate node-red-contrib-influxdb node-red-contrib-modbus --save
