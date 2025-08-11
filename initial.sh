@@ -34,7 +34,7 @@ update_grub() {
 
 edit_interfaces() {
   echo "### Editing /etc/network/interfaces"
-  nano /etc/network/interfaces
+  nano /etc/network/interfaces < /dev/tty > /dev/tty
 }
 
 install_cert() {
