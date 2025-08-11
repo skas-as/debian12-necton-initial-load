@@ -49,7 +49,7 @@ join_domain() {
   install_cert
   echo "### Joining domain..."
   # installing necessary packages
-  apt install adcli packagekit samba-common-bin sudo -y
+  apt install adcli packagekit samba-common-bin sudo curl vim -y
   apt install realmd -y
   # testing ad discovery
   realm -v discover "$AD_DOMAIN"
@@ -95,7 +95,7 @@ execute_all() {
 
 deploy_nodered() {
   echo "### Installing Node-RED..."
-  apt update && apt install curl git build-essential libpam0g-dev -y
+  apt update && apt install git build-essential libpam0g-dev -y
   # add nodered user
   adduser --home /home/nodered --disabled-password --gecos "" nodered
   # give it tmp root access
